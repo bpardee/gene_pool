@@ -44,7 +44,7 @@ class GenePoolTest < Test::Unit::TestCase
   
   context '' do
     setup do
-      @stringio = StringIO.new
+      #@stringio = StringIO.new
       #@logger = Logger.new($stdout)
       #@logger = Logger.new(@stringio)
       @logger = nil

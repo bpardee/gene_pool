@@ -1,0 +1,37 @@
+= gene_pool
+
+* http://github.com/bpardee/gene_pool
+
+== DESCRIPTION:
+
+Generic pooling library for connection pools.
+
+== FEATURES/PROBLEMS:
+
+* Thread-safe
+* Pure ruby
+
+== INSTALL:
+
+  gem install gene_pool
+
+== EXAMPLE USAGE:
+
+  class MyClient
+    @@gene_pool = GenePool.new(:name         => 'MyClient',
+                               :pool_size    => 10,
+                               :warn_timeout => 0.25,
+                               :logger       => Rails.logger) do
+      TCPSocket.new('myserver', 4321)
+    end
+
+    def send_message
+      @@gene_pool.with_connection do |socket|
+        # use socket here
+      end
+    end
+  end
+
+== Copyright
+
+Copyright (c) 2010 Brad Pardee. See LICENSE for details.
