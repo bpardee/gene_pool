@@ -40,9 +40,9 @@ class GenePool
             connection = reserved_connection_placeholder
             @connections << connection
             @checked_out << connection
-            @logger.debug "#{@name}: Created connection ##{@connections.size} #{connection}:#{connection.object_id} for #{name}" if @logger
+            @logger.debug "#{@name}: Created connection ##{@connections.size} #{connection}:#{connection.object_id} for #{name}" if @logger && @logger.debug?
           else
-            @logger.debug "#{@name}: Waiting for an available connection, all #{@pool_size} connections are checked out." if @logger
+            @logger.info "#{@name}: Waiting for an available connection, all #{@pool_size} connections are checked out." if @logger
             @queue.wait(@mutex)
           end
         end
@@ -58,7 +58,7 @@ class GenePool
       connection = renew(reserved_connection_placeholder)
     end
     
-    @logger.debug "#{@name}: Checkout connection #{connection.object_id} self=#{self}" if @logger
+    @logger.debug "#{@name}: Checkout connection #{connection.object_id} self=#{self}" if @logger && @logger.debug?
     return connection
   end
 
@@ -68,7 +68,7 @@ class GenePool
       @checked_out.delete(connection)
       @queue.signal
     end
-    @logger.debug "#{@name}: Checkin connection #{connection.object_id} self=#{self}" if @logger
+    @logger.debug "#{@name}: Checkin connection #{connection.object_id} self=#{self}" if @logger && @logger.debug?
   end
   
   # Create a scope for checking out a connection
@@ -95,7 +95,7 @@ class GenePool
       @checked_out.delete(connection)
       @queue.signal
     end
-    @logger.debug "#{@name}: Removed connection #{connection.object_id} self=#{self}" if @logger
+    @logger.debug "#{@name}: Removed connection #{connection.object_id} self=#{self}" if @logger && @logger.debug?
   end
 
   # If a connection needs to be renewed for some reason, reassign it here
@@ -116,7 +116,7 @@ class GenePool
       with_key = @with_map.index(old_connection)
       @with_map[with_key] = new_connection if with_key
     end
-    @logger.debug "#{@name}: Renewed connection old=#{old_connection.object_id} new=#{new_connection}:#{new_connection.object_id}" if @logger
+    @logger.debug "#{@name}: Renewed connection old=#{old_connection.object_id} new=#{new_connection}:#{new_connection.object_id}" if @logger && @logger.debug?
     return new_connection
   end
   
