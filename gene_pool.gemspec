@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Brad Pardee"]
-  s.date = %q{2010-09-05}
+  s.date = %q{2010-09-08}
   s.description = %q{Generic pooling library for creating a connection pool}
   s.email = %q{bradpardee@gmail.com}
   s.extra_rdoc_files = [
@@ -17,7 +17,8 @@ Gem::Specification.new do |s|
      "README.rdoc"
   ]
   s.files = [
-    "History.txt",
+    ".gitignore",
+     "History.txt",
      "LICENSE",
      "README.rdoc",
      "Rakefile",
@@ -29,7 +30,7 @@ Gem::Specification.new do |s|
   s.homepage = %q{http://github.com/bpardee/gene_pool}
   s.rdoc_options = ["--charset=UTF-8"]
   s.require_paths = ["lib"]
-  s.rubygems_version = %q{1.3.7}
+  s.rubygems_version = %q{1.3.6}
   s.summary = %q{Generic pooling library for creating a connection pool}
   s.test_files = [
     "test/gene_pool_test.rb"
@@ -39,7 +40,7 @@ Gem::Specification.new do |s|
     current_version = Gem::Specification::CURRENT_SPECIFICATION_VERSION
     s.specification_version = 3
 
-    if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
+    if Gem::Version.new(Gem::RubyGemsVersion) >= Gem::Version.new('1.2.0') then
     else
     end
   else
