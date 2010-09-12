@@ -58,7 +58,7 @@ class GenePool
       connection = renew(reserved_connection_placeholder)
     end
     
-    @logger.debug "#{@name}: Checkout connection #{connection.object_id} self=#{self}" if @logger && @logger.debug?
+    @logger.debug "#{@name}: Checkout connection #{connection.object_id} self=#{dump}" if @logger && @logger.debug?
     return connection
   end
 
@@ -68,7 +68,7 @@ class GenePool
       @checked_out.delete(connection)
       @queue.signal
     end
-    @logger.debug "#{@name}: Checkin connection #{connection.object_id} self=#{self}" if @logger && @logger.debug?
+    @logger.debug "#{@name}: Checkin connection #{connection.object_id} self=#{dump}" if @logger && @logger.debug?
   end
   
   # Create a scope for checking out a connection
@@ -95,7 +95,7 @@ class GenePool
       @checked_out.delete(connection)
       @queue.signal
     end
-    @logger.debug "#{@name}: Removed connection #{connection.object_id} self=#{self}" if @logger && @logger.debug?
+    @logger.debug "#{@name}: Removed connection #{connection.object_id} self=#{dump}" if @logger && @logger.debug?
   end
 
   # If a connection needs to be renewed for some reason, reassign it here
@@ -122,13 +122,20 @@ class GenePool
   
   # Perform the given block for each connection, i.e., closing each connection.
   def each
-    @connections.each { |connection| yield connection }
+    @mutex.synchronize do
+      @connections.each { |connection| yield connection }
+    end
   end
   
-  def to_s
-    conn = @connections.map{|c| c.object_id}.join(',')
-    chk  = @checked_out.map{|c| c.object_id}.join(',')
-    with = @with_map.keys.map{|k| "#{k}=#{@with_map[k].object_id}"}.join(',')
+  private
+  
+  def dump
+    conn = chk = with = nil
+    @mutex.synchronize do
+      conn = @connections.map{|c| c.object_id}.join(',')
+      chk  = @checked_out.map{|c| c.object_id}.join(',')
+      with = @with_map.keys.map{|k| "#{k}=#{@with_map[k].object_id}"}.join(',')
+    end
     "connections=#{conn} checked_out=#{chk} with_map=#{with}"
   end
 end
