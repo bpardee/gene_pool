@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gene_pool}
-  s.version = "1.0.1"
+  s.version = "1.1.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Brad Pardee"]
-  s.date = %q{2010-09-12}
+  s.date = %q{2010-11-11}
   s.description = %q{Generic pooling library for creating a connection pool}
   s.email = %q{bradpardee@gmail.com}
   s.extra_rdoc_files = [

@@ -15,6 +15,7 @@ class DummyConnection
   def initialize(count, sleep_time=nil)
     sleep sleep_time if sleep_time
     @count = count
+    @closed = false
   end
   
   def to_i
@@ -23,6 +24,18 @@ class DummyConnection
   
   def to_s
     @count.to_s
+  end
+
+  def fail_on(*counts)
+    raise Exception.new("Dummy exception on count #{@count}") if counts.include?(@count)
+  end
+
+  def close
+    @closed = true
+  end
+
+  def closed?
+    @closed
   end
 end
     
@@ -227,6 +240,54 @@ class GenePoolTest < Test::Unit::TestCase
       @gene_pool.each { |conn| ival_conns << conn.to_i }
       ival_conns.sort!
       assert_equal (1..pool_size).to_a, ival_conns
+    end
+
+    should 'be able to auto-retry connection' do
+      i = 1
+      [false, true].each do |stat|
+        conns = []
+        @gene_pool.with_connection_auto_retry(stat) do |conn|
+          conns << conn
+          conn.fail_on(i)
+          assert_equal 1, @gene_pool.connections.size
+          assert_equal 1, @gene_pool.checked_out.size
+          assert_equal i+1, conn.to_i
+        end
+        assert_equal stat, conns[0].closed?
+        assert !conns[1].closed?
+        i += 1
+      end
+      assert_equal 1, @gene_pool.connections.size
+      assert_equal 0, @gene_pool.checked_out.size
+    end
+
+    should 'fail with auto-retry on double failure' do
+      e = assert_raises Exception do
+        @gene_pool.with_connection_auto_retry(false) do |conn|
+          conn.fail_on(1,2)
+        end
+      end
+      assert_match %r%Dummy exception%, e.message
+      assert_equal 0, @gene_pool.connections.size
+      assert_equal 0, @gene_pool.checked_out.size
+    end
+
+    should 'not auto-retry on timeout' do
+      @sleep = 2
+      @timeout = 1
+      e = assert_raises Timeout::Error do
+        @gene_pool.with_connection_auto_retry do |conn|
+        end
+      end
+      assert_equal 0, @gene_pool.connections.size
+      assert_equal 0, @gene_pool.checked_out.size
+      @sleep = 0
+      @gene_pool.with_connection_auto_retry do |conn|
+        assert_equal 2, conn.to_i
+        assert_equal 1, @gene_pool.checked_out.size
+      end
+      assert_equal 1, @gene_pool.connections.size
+      assert_equal 0, @gene_pool.checked_out.size
     end
   end
 end

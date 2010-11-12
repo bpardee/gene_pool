@@ -30,6 +30,13 @@ Generic pooling library for connection pools.
         # use socket here
       end
     end
+
+    def send_message_auto_retry
+      # On exception, close and reopen socket and perform retry
+      @@gene_pool.with_connection_auto_retry do |socket|
+        # use socket here, 
+      end
+    end
   end
 
 == Copyright

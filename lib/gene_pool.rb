@@ -88,6 +88,33 @@ class GenePool
     end
   end
   
+  # Create a scope for checking out a connection while automatically retrying on exception
+  def with_connection_auto_retry(close_on_error = true)
+    with_connection do |connection|
+      begin
+        yield connection
+      rescue Exception => e
+        if close_on_error
+          connection.close rescue nil
+        end
+        if (e.kind_of?(Timeout::Error))
+          remove(connection)
+          raise
+        end
+        connection = renew(connection)
+        begin
+          yield connection
+        rescue Exception => e
+          if close_on_error
+            connection.close rescue nil
+          end
+          remove(connection)
+          raise
+        end
+      end
+    end
+  end
+
   # Remove an existing connection from the pool
   def remove(connection)
     @mutex.synchronize do
