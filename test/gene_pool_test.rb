@@ -12,14 +12,11 @@ class GenePool
 end
 
 class DummyConnection
+  attr_reader :count
   def initialize(count, sleep_time=nil)
     sleep sleep_time if sleep_time
     @count = count
     @closed = false
-  end
-  
-  def to_i
-    @count
   end
   
   def to_s
@@ -63,7 +60,6 @@ class GenePoolTest < Test::Unit::TestCase
       @logger = nil
       # Override sleep in individual tests
       @sleep = nil
-      @timeout = 5
       counter = 0
       mutex = Mutex.new
       @gene_pool = GenePool.new(:name         => 'TestGenePool',
@@ -74,9 +70,7 @@ class GenePoolTest < Test::Unit::TestCase
         mutex.synchronize do
           count = counter += 1
         end
-        Timeout.timeout(@timeout) do
-          DummyConnection.new(count, @sleep)
-        end
+        DummyConnection.new(count, @sleep)
       end
     end
 
@@ -90,7 +84,7 @@ class GenePoolTest < Test::Unit::TestCase
     should 'create 1 connection' do
       (1..3).each do |i|
         @gene_pool.with_connection do |conn|
-          assert_equal conn.to_i, 1
+          assert_equal conn.count, 1
           assert_equal 1,         @gene_pool.connections.size
           assert_equal 1,         @gene_pool.checked_out.size
           assert_same  conn,      @gene_pool.connections[0]
@@ -104,8 +98,8 @@ class GenePoolTest < Test::Unit::TestCase
       conn1 = @gene_pool.checkout
       (1..3).each do |i|
         @gene_pool.with_connection do |conn2|
-          assert_equal 1, conn1.to_i
-          assert_equal 2, conn2.to_i
+          assert_equal 1, conn1.count
+          assert_equal 2, conn2.count
           assert_equal 2, @gene_pool.connections.size
           assert_equal 2, @gene_pool.checked_out.size
           assert_same  conn1, @gene_pool.connections[0]
@@ -123,9 +117,9 @@ class GenePoolTest < Test::Unit::TestCase
       @gene_pool.with_connection do |conn1|
         conn2 = @gene_pool.renew(conn1)
         conn3 = @gene_pool.renew(conn2)
-        assert_equal 1, conn1.to_i
-        assert_equal 2, conn2.to_i
-        assert_equal 3, conn3.to_i
+        assert_equal 1, conn1.count
+        assert_equal 2, conn2.count
+        assert_equal 3, conn3.count
         assert_equal 1, @gene_pool.connections.size
         assert_equal 1, @gene_pool.checked_out.size
       end
@@ -167,12 +161,10 @@ class GenePoolTest < Test::Unit::TestCase
     should 'handle aborted connection' do
       @gene_pool.with_connection do |conn1|
         @sleep = 2
-        @timeout = 1
-        begin
-          @gene_pool.with_connection { |conn2| }
-          flunk "connection should have timed out"
-        rescue  Timeout::Error => e
-          #pass
+        e = assert_raises Timeout::Error do
+          Timeout.timeout(1) do
+            @gene_pool.with_connection { |conn2| }
+          end
         end
         assert_equal 1, @gene_pool.connections.size
         assert_equal 1, @gene_pool.checked_out.size
@@ -182,7 +174,10 @@ class GenePoolTest < Test::Unit::TestCase
       # Do another test just to be sure nothings hosed
       @sleep = nil
       @gene_pool.with_connection do |conn1|
-        assert 1, conn1.to_i
+        assert 1, conn1.count
+        @gene_pool.with_connection do |conn2|
+          assert 3, conn2.count
+        end
       end
     end
   
@@ -192,7 +187,7 @@ class GenePoolTest < Test::Unit::TestCase
       (1..pool_size).each do |i|
         c = @gene_pool.checkout
         conns << c
-        assert_equal i, c.to_i
+        assert_equal i, c.count
         assert_equal i, @gene_pool.connections.size
         assert_equal i, @gene_pool.checked_out.size
         assert_equal conns, @gene_pool.connections
@@ -237,7 +232,7 @@ class GenePoolTest < Test::Unit::TestCase
         assert_equal 0,         @gene_pool.checked_out.size
       end
       ival_conns = []
-      @gene_pool.each { |conn| ival_conns << conn.to_i }
+      @gene_pool.each { |conn| ival_conns << conn.count }
       ival_conns.sort!
       assert_equal (1..pool_size).to_a, ival_conns
     end
@@ -251,7 +246,7 @@ class GenePoolTest < Test::Unit::TestCase
           conn.fail_on(i)
           assert_equal 1, @gene_pool.connections.size
           assert_equal 1, @gene_pool.checked_out.size
-          assert_equal i+1, conn.to_i
+          assert_equal i+1, conn.count
         end
         assert_equal stat, conns[0].closed?
         assert !conns[1].closed?
@@ -270,20 +265,25 @@ class GenePoolTest < Test::Unit::TestCase
       assert_match %r%Dummy exception%, e.message
       assert_equal 0, @gene_pool.connections.size
       assert_equal 0, @gene_pool.checked_out.size
+      @gene_pool.with_connection do |conn|
+        assert_equal 3, conn.count
+      end
     end
 
     should 'not auto-retry on timeout' do
-      @sleep = 2
-      @timeout = 1
       e = assert_raises Timeout::Error do
-        @gene_pool.with_connection_auto_retry do |conn|
+        Timeout.timeout(1) do
+          @gene_pool.with_connection_auto_retry do |conn|
+            sleep 2
+            assert false, true
+          end
         end
       end
       assert_equal 0, @gene_pool.connections.size
       assert_equal 0, @gene_pool.checked_out.size
       @sleep = 0
       @gene_pool.with_connection_auto_retry do |conn|
-        assert_equal 2, conn.to_i
+        assert_equal 2, conn.count
         assert_equal 1, @gene_pool.checked_out.size
       end
       assert_equal 1, @gene_pool.connections.size

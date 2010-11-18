@@ -97,7 +97,7 @@ class GenePool
         if close_on_error
           connection.close rescue nil
         end
-        if (e.kind_of?(Timeout::Error))
+        if e.kind_of?(Timeout::Error) || e.message =~ /expired/
           remove(connection)
           raise
         end
