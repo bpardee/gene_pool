@@ -1,3 +1,4 @@
 doc
-pkg
 .idea
+gene_pool-*.gem
+Gemfile.lock
