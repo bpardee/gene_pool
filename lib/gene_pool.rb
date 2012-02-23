@@ -11,6 +11,7 @@ class GenePool
   #   name - The name used in logging messages
   #   pool_size - The maximum number of instances that will be created (Defaults to 1).
   #   warn_timeout - Displays an error message if a checkout takes longer that the given time (used to give hints to increase the pool size)
+  #   idle_timeout - If set, the connection will be renewed if it hasn't been used in this amount of time (seconds)
   #   logger - The logger used for log messages, defaults to STDERR.
   #   close_proc - The process or method used to close a pooled instance when it is removed.
   #     Defaults to :close.  Set to nil for no-op or a symbol for a method or a proc that takes an argument for the instance.
@@ -20,8 +21,14 @@ class GenePool
     @name         = options[:name]         || 'GenePool'
     @pool_size    = options[:pool_size]    || 1
     @warn_timeout = options[:warn_timeout] || 5.0
-    @logger       = options[:logger]       || Logger.new(STDERR)
+    @idle_timeout = options[:idle_timeout]
+    @logger       = options[:logger]
     @close_proc   = options[:close_proc]   || :close
+
+    unless @logger
+      @logger = Logger.new(STDERR)
+      @logger.level = Logger::INFO
+    end
 
     # Mutex for synchronizing pool access
     @mutex = Mutex.new
@@ -89,6 +96,8 @@ class GenePool
     end
     if connection == reserved_connection_placeholder
       connection = renew(reserved_connection_placeholder)
+    elsif @idle_timeout && (Time.now - connection._last_used) >= @idle_timeout
+      connection = renew(connection)
     end
     
     @logger.debug {"#{@name}: Checkout connection #{connection}(#{connection.object_id}) self=#{self}"}
@@ -197,7 +206,7 @@ class GenePool
       @checked_out[index] = new_connection
       @connections[@connections.index(old_connection)] = new_connection
       # If this is part of a with_connection block, then track our new connection
-      with_key = @with_map.index(old_connection)
+      with_key = @with_map.key(old_connection)
       @with_map[with_key] = new_connection if with_key
     end
     @logger.debug {"#{@name}: Renewed connection old=#{old_connection.object_id} new=#{new_connection}(#{new_connection.object_id})"}
@@ -206,7 +215,7 @@ class GenePool
   
   # Perform the given block for each connection.  Note that close should be used for safely closing all connections
   def each
-    # TBD: Should this be removed?
+    # TBD: Should this be removed?  This should probably only ever be used to allow interrupt of a connection that is checked out?
     @mutex.synchronize do
       @connections.each { |connection| yield connection }
     end
@@ -259,8 +268,10 @@ class GenePool
     else
       @close_proc.call(connection)
     end
+  rescue NoMethodError
+    @logger.warn "Unable to close, you should explicitly set :close_proc => nil in the gene_pool options"
   rescue Exception => e
-    @logger.warn "Exception trying to close #{connection}(#{connection.object_id}): #{e.message}"
+    @logger.warn "Exception trying to close #{connection}(#{connection.object_id}): #{e.message}\n\t#{e.backtrace.join("\n\t")}"
   end
 
   # Clients should have obtained the mutex before calling this!

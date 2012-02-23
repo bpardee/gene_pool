@@ -48,7 +48,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 'GenePool', @gene_pool.name
       assert_equal 1,          @gene_pool.pool_size
       assert_equal 5.0,        @gene_pool.warn_timeout
-      assert_nil               @gene_pool.logger
+      assert                   @gene_pool.logger
     end
   end
   
@@ -57,15 +57,14 @@ class GenePoolTest < Test::Unit::TestCase
       #@stringio = StringIO.new
       #@logger = Logger.new($stdout)
       #@logger = Logger.new(@stringio)
-      @logger = nil
       # Override sleep in individual tests
       @sleep = nil
       counter = 0
       mutex = Mutex.new
       @gene_pool = GenePool.new(:name         => 'TestGenePool',
                                 :pool_size    => 10,
-                                :warn_timeout => 2.0,
-                                :logger       => @logger) do
+                                #:logger       => @logger,
+                                :warn_timeout => 2.0) do
         count = nil
         mutex.synchronize do
           count = counter += 1
@@ -76,9 +75,9 @@ class GenePoolTest < Test::Unit::TestCase
 
     should 'have options set' do
       assert_equal 'TestGenePool', @gene_pool.name
-      assert_equal 10,            @gene_pool.pool_size
+      assert_equal 10,             @gene_pool.pool_size
       assert_equal 2.0,            @gene_pool.warn_timeout
-      assert_same  @logger,        @gene_pool.logger
+      #assert_same  @logger,        @gene_pool.logger
     end
 
     should 'create 1 connection' do
@@ -174,9 +173,9 @@ class GenePoolTest < Test::Unit::TestCase
       # Do another test just to be sure nothings hosed
       @sleep = nil
       @gene_pool.with_connection do |conn1|
-        assert 1, conn1.count
+        assert_equal 1, conn1.count
         @gene_pool.with_connection do |conn2|
-          assert 3, conn2.count
+          assert_equal 3, conn2.count
         end
       end
     end
@@ -238,27 +237,29 @@ class GenePoolTest < Test::Unit::TestCase
     end
 
     should 'be able to auto-retry connection' do
-      i = 1
-      [false, true].each do |stat|
-        conns = []
-        @gene_pool.with_connection_auto_retry(stat) do |conn|
-          conns << conn
-          conn.fail_on(i)
-          assert_equal 1, @gene_pool.connections.size
-          assert_equal 1, @gene_pool.checked_out.size
-          assert_equal i+1, conn.count
-        end
-        assert_equal stat, conns[0].closed?
-        assert !conns[1].closed?
-        i += 1
+      conns = []
+      @gene_pool.with_connection_auto_retry do |conn|
+        conns << conn
+        conn.fail_on(1)
+        assert_equal 1, @gene_pool.connections.size
+        assert_equal 1, @gene_pool.checked_out.size
+        assert_equal 2, conn.count
       end
+      @gene_pool.with_connection_auto_retry do |conn|
+        conns << conn
+        assert_equal 1, @gene_pool.connections.size
+        assert_equal 1, @gene_pool.checked_out.size
+      end
+      assert conns[0].closed?
+      assert !conns[1].closed?
+      assert_same conns[1], conns[2]
       assert_equal 1, @gene_pool.connections.size
       assert_equal 0, @gene_pool.checked_out.size
     end
 
     should 'fail with auto-retry on double failure' do
       e = assert_raises Exception do
-        @gene_pool.with_connection_auto_retry(false) do |conn|
+        @gene_pool.with_connection_auto_retry do |conn|
           conn.fail_on(1,2)
         end
       end
@@ -288,6 +289,53 @@ class GenePoolTest < Test::Unit::TestCase
       end
       assert_equal 1, @gene_pool.connections.size
       assert_equal 0, @gene_pool.checked_out.size
+    end
+
+    should 'allow cleanup of idle connections' do
+      conn1 = @gene_pool.checkout
+      conn2 = @gene_pool.checkout
+      @gene_pool.checkin(conn1)
+      sleep 2
+      @gene_pool.checkin(conn2)
+      assert_equal 2, @gene_pool.connections.size
+      assert_equal 0, @gene_pool.checked_out.size
+      @gene_pool.remove_idle(1)
+      assert_equal 1, @gene_pool.connections.size
+      assert conn1.closed?
+      assert !conn2.closed?
+    end
+  end
+
+  context 'idle timeout' do
+    setup do
+      # Override sleep in individual tests
+      @sleep = nil
+      counter = 0
+      mutex = Mutex.new
+      @gene_pool = GenePool.new(:name         => 'TestGenePool',
+                                :pool_size    => 10,
+                                :idle_timeout => 2.0) do
+        count = nil
+        mutex.synchronize do
+          count = counter += 1
+        end
+        DummyConnection.new(count, @sleep)
+      end
+    end
+
+    should 'create a new connection if we pass the idle timeout' do
+      conn1, conn2, conn3 = nil
+      @gene_pool.with_connection { |conn| conn1 = conn }
+      @gene_pool.with_connection { |conn| conn2 = conn }
+      assert_equal 1, @gene_pool.connections.size
+      sleep 3
+      @gene_pool.with_connection { |conn| conn3 = conn }
+      assert_equal 1, @gene_pool.connections.size
+      assert_same conn1, conn2
+      assert_equal 1, conn1.count
+      assert_equal 2, conn3.count
+      assert conn1.closed?
+      assert !conn3.closed?
     end
   end
 end

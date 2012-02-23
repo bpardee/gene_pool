@@ -6,6 +6,9 @@ GenePool Changelog
   - Allow dynamic modification of pool size.
   - Added close method which will prevent checking out of new connections and wait for and close all current connections.
   - Added remove_idle method which will close all current connections which have been idle for the given idle_time.
+  - with_connection_auto_retry no longer accepts an argument (it defaulted to true previously) because of the addition
+    of the close_proc option which defaults to :close.  This should be set to nil if no closing is necessary
+    (Deepest apologies for making an incompatible change if anyone is actually using this argument).
 
 1.1.1 / 2010-11-18
 

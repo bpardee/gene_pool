@@ -18,9 +18,12 @@ Generic pooling library for connection pools.
 ## EXAMPLE USAGE:
 
       class MyClient
+        # Print a logger warning if it requires more than 0.25 seconds to acquire a connection.
+        # Close and reopen the connection if it hasn't been used for 10 seconds.
         @@gene_pool = GenePool.new(:name         => 'MyClient',
                                    :pool_size    => 10,
                                    :warn_timeout => 0.25,
+                                   :idle_timeout => 10,
                                    :logger       => Rails.logger,
                                    :close_proc   => :close) do
           TCPSocket.new('myserver', 4321)
@@ -55,4 +58,4 @@ Generic pooling library for connection pools.
 
 ## Copyright
 
-Copyright (c) 2010-2011 Brad Pardee. See LICENSE for details.
+Copyright (c) 2010-2012 Brad Pardee. See LICENSE for details.
