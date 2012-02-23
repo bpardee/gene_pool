@@ -23,7 +23,7 @@ class GenePool
     @warn_timeout = options[:warn_timeout] || 5.0
     @idle_timeout = options[:idle_timeout]
     @logger       = options[:logger]
-    @close_proc   = options[:close_proc]   || :close
+    @close_proc   = options[:close_proc]   || (!options.has_key?(:close_proc) && :close)
 
     unless @logger
       @logger = Logger.new(STDERR)

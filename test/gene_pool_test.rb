@@ -17,6 +17,7 @@ class DummyConnection
     sleep sleep_time if sleep_time
     @count = count
     @closed = false
+    @other_closed = false
   end
   
   def to_s
@@ -33,6 +34,14 @@ class DummyConnection
 
   def closed?
     @closed
+  end
+
+  def other_close
+    @other_closed = true
+  end
+
+  def other_closed?
+    @other_closed
   end
 end
     
@@ -337,5 +346,61 @@ class GenePoolTest < Test::Unit::TestCase
       assert conn1.closed?
       assert !conn3.closed?
     end
+  end
+
+  context 'close_proc' do
+    should 'default to close if not specified' do
+      @gene_pool = GenePool.new do
+        DummyConnection.new(0, 0)
+      end
+      conn = nil
+      @gene_pool.with_connection { |c| conn = c }
+      @gene_pool.remove_idle(0)
+      assert conn.closed?
+      assert !conn.other_closed?
+    end
+
+    should 'allow symbol to execute a different method from close' do
+      @gene_pool = GenePool.new(:close_proc => :other_close) do
+        DummyConnection.new(0, 0)
+      end
+      conn = nil
+      @gene_pool.with_connection { |c| conn = c }
+      @gene_pool.remove_idle(0)
+      assert !conn.closed?
+      assert conn.other_closed?
+    end
+
+
+    should 'allow nil so it does not execute a close' do
+      @gene_pool = GenePool.new(:close_proc => nil) do
+        DummyConnection.new(0, 0)
+      end
+      conn = nil
+      @gene_pool.with_connection { |c| conn = c }
+      @gene_pool.remove_idle(0)
+      assert !conn.closed?
+      assert !conn.other_closed?
+    end
+
+    should 'allow proc that gets executed on close' do
+      foo = 1
+      close_conn = nil
+      my_close = lambda do |conn|
+        close_conn = conn
+        foo = 2
+      end
+      @gene_pool = GenePool.new(:close_proc => my_close) do
+        DummyConnection.new(0, 0)
+      end
+      conn = nil
+      @gene_pool.with_connection { |c| conn = c }
+      @gene_pool.remove_idle(0)
+      assert !conn.closed?
+      assert !conn.other_closed?
+      assert_same conn, close_conn
+      assert_equal 2, foo
+    end
+
   end
 end
