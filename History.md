@@ -1,6 +1,10 @@
 GenePool Changelog
 =====================
 
+1.2.2 / 2012-02-23
+
+  - Do a respond_to? to check compatibility instead of hacking around with $VERBOSE
+
 1.2.1 / 2012-02-23
 
   - Oops, broke 1.8 compatibility with 1.2.0.  Hacking $VERBOSE setting so as to not spam deprecation warnings.

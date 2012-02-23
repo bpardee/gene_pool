@@ -206,11 +206,13 @@ class GenePool
       @checked_out[index] = new_connection
       @connections[@connections.index(old_connection)] = new_connection
 
-      # Suppress spam of deprecation warnings since 1.8 doesn't support Hash#key
-      old_verbose, $VERBOSE = $VERBOSE, nil
       # If this is part of a with_connection block, then track our new connection
-      with_key = @with_map.index(old_connection)
-      $VERBOSE = old_verbose
+      if @with_map.respond_to?(:key)
+        with_key = @with_map.key(old_connection)
+      else
+        # 1.8 compatibility
+        with_key = @with_map.index(old_connection)
+      end
 
       @with_map[with_key] = new_connection if with_key
     end
