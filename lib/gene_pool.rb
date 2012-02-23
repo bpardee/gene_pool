@@ -206,7 +206,7 @@ class GenePool
       @checked_out[index] = new_connection
       @connections[@connections.index(old_connection)] = new_connection
       # If this is part of a with_connection block, then track our new connection
-      with_key = @with_map.key(old_connection)
+      with_key = @with_map.index(old_connection)
       @with_map[with_key] = new_connection if with_key
     end
     @logger.debug {"#{@name}: Renewed connection old=#{old_connection.object_id} new=#{new_connection}(#{new_connection.object_id})"}
