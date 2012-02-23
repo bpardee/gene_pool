@@ -1,7 +1,11 @@
 GenePool Changelog
 =====================
 
-1.2.0 / 2011-12-07
+1.2.1 / 2012-02-23
+
+  - Oops, broke 1.8 compatibility with 1.2.0.  Hacking $VERBOSE setting so as to not spam deprecation warnings.
+
+1.2.0 / 2012-02-23
 
   - Allow dynamic modification of pool size.
   - Added close method which will prevent checking out of new connections and wait for and close all current connections.
