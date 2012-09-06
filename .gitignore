@@ -3,3 +3,7 @@ doc
 gene_pool-*.gem
 Gemfile.lock
 .rvmrc
+.rbenv-*
+.bundle
+bin
+vendor

@@ -222,8 +222,8 @@ class GenePool
   end
   
   # Perform the given block for each connection.  Note that close should be used for safely closing all connections
+  # This should probably only ever be used to allow interrupt of a connection that is checked out?
   def each
-    # TBD: Should this be removed?  This should probably only ever be used to allow interrupt of a connection that is checked out?
     @mutex.synchronize do
       @connections.each { |connection| yield connection }
     end

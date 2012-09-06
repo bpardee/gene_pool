@@ -1,9 +1,13 @@
 GenePool Changelog
 =====================
 
+1.2.4 / 2012-09-05
+
+  - require 'thread' under ruby 1.8 so that mutex is defined (Thanks soupmatt!)
+
 1.2.3 / 2012-02-23
 
-  - Allow setting of options[:close_proc] to nil (Should have just stayed home today).
+  - Allow setting of options[:close_proc] to nil
 
 1.2.2 / 2012-02-23
 

@@ -7,6 +7,6 @@ Gem::Specification.new do |s|
   s.homepage      = 'http://github.com/bpardee/gene_pool'
   s.files         = Dir["{examples,lib}/**/*"] + %w(LICENSE.txt Rakefile Gemfile History.md README.md)
   s.test_files    = ["test/gene_pool_test.rb"]
-  s.version       = '1.2.3'
+  s.version       = '1.2.4'
   s.require_paths = ["lib"]
 end
