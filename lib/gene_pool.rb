@@ -1,4 +1,5 @@
 require 'logger'
+require 'thread' if RUBY_VERSION < '1.9'
 
 # Generic connection pool class
 class GenePool
