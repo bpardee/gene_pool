@@ -1,6 +1,10 @@
 GenePool Changelog
 =====================
 
+1.3.0 / 2012-09-10
+
+  - Allow :timeout option to raise Timeout::Error if waiting for a connection exceeds this value.
+
 1.2.4 / 2012-09-05
 
   - require 'thread' under ruby 1.8 so that mutex is defined (Thanks soupmatt!)

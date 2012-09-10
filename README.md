@@ -20,8 +20,10 @@ Generic pooling library for connection pools.
       class MyClient
         # Print a logger warning if it requires more than 0.25 seconds to acquire a connection.
         # Close and reopen the connection if it hasn't been used for 10 seconds.
+        # Raise Timeout::Error if waiting for a connection more than 3 seconds.
         @@gene_pool = GenePool.new(:name         => 'MyClient',
                                    :pool_size    => 10,
+                                   :timeout      => 3,
                                    :warn_timeout => 0.25,
                                    :idle_timeout => 10,
                                    :logger       => Rails.logger,

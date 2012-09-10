@@ -1,5 +1,5 @@
 require 'logger'
-require 'thread' if RUBY_VERSION < '1.9'
+require 'thread'
 
 # Generic connection pool class
 class GenePool
@@ -9,18 +9,20 @@ class GenePool
   # Creates a gene_pool.  The passed block will be used to initialize a single instance of
   # the item being pooled (i.e., socket connection or whatever)
   # options -
-  #   name - The name used in logging messages
-  #   pool_size - The maximum number of instances that will be created (Defaults to 1).
-  #   warn_timeout - Displays an error message if a checkout takes longer that the given time (used to give hints to increase the pool size)
-  #   idle_timeout - If set, the connection will be renewed if it hasn't been used in this amount of time (seconds)
-  #   logger - The logger used for log messages, defaults to STDERR.
-  #   close_proc - The process or method used to close a pooled instance when it is removed.
+  #   name         - The name used in logging messages.
+  #   pool_size    - The maximum number of instances that will be created (Defaults to 1).
+  #   timeout      - Will raise a Timeout exception if waiting on a connection for this many seconds.
+  #   warn_timeout - Displays an error message if a checkout takes longer that the given time (used to give hints to increase the pool size).
+  #   idle_timeout - If set, the connection will be renewed if it hasn't been used in this amount of time (seconds).
+  #   logger       - The logger used for log messages, defaults to STDERR.
+  #   close_proc   - The process or method used to close a pooled instance when it is removed.
   #     Defaults to :close.  Set to nil for no-op or a symbol for a method or a proc that takes an argument for the instance.
   def initialize(options={}, &connect_block)
     @connect_block = connect_block
 
     @name         = options[:name]         || 'GenePool'
     @pool_size    = options[:pool_size]    || 1
+    @timeout      = options[:timeout]
     @warn_timeout = options[:warn_timeout] || 5.0
     @idle_timeout = options[:idle_timeout]
     @logger       = options[:logger]
@@ -31,17 +33,13 @@ class GenePool
       @logger.level = Logger::INFO
     end
 
-    # Mutex for synchronizing pool access
-    @mutex = Mutex.new
-
-    # Condition variable for waiting for an available connection
-    @condition = ConditionVariable.new
-
     @connections = []
     @checked_out = []
     # Map the original connections object_id within the with_connection method to the final connection.
     # This could change if the connection is renew'ed.
     @with_map    = {}
+
+    setup_mutex
   end
 
   def size
@@ -84,7 +82,7 @@ class GenePool
             @logger.debug {"#{@name}: Created connection ##{@connections.size} #{connection}(#{connection.object_id}) for #{name}"}
           else
             @logger.info "#{@name}: Waiting for an available connection, all #{@pool_size} connections are checked out."
-            @condition.wait(@mutex)
+            wait_mutex(start_time)
           end
         end
       end
@@ -231,8 +229,8 @@ class GenePool
 
   def close(timeout=10)
     self.pool_size = 0
-    start = Time.now
-    while (Time.now - start) < timeout
+    start_time = Time.now
+    while (Time.now - start_time) < timeout
       sleep 1
       @mutex.synchronize do
         return if @connections.empty?
@@ -286,5 +284,42 @@ class GenePool
   def remove_and_close(connection)
     @connections.delete(connection)
     close_connection(connection)
+  end
+
+  if RUBY_VERSION < '1.9'
+    require 'monitor'
+    def setup_mutex
+      @connections.extend(MonitorMixin)
+      # Mutex for synchronizing pool access
+      @mutex = @connections
+      # Condition variable for waiting for an available connection
+      @condition = @mutex.new_cond
+    end
+
+    def wait_mutex(start_time)
+      return @condition.wait unless @timeout
+      delta = @timeout - (Time.now - start_time)
+      raise Timeout::Error if delta <= 0.0
+      @condition.wait(delta)
+      delta = @timeout - (Time.now - start_time)
+      raise Timeout::Error if delta <= 0.0
+    end
+
+  else # RUBY_VERSION >= '1.9'
+    def setup_mutex
+      # Mutex for synchronizing pool access
+      @mutex = Mutex.new
+      # Condition variable for waiting for an available connection
+      @condition = ConditionVariable.new
+    end
+
+    def wait_mutex(start_time)
+      return @condition.wait(@mutex) unless @timeout
+      delta = @timeout - (Time.now - start_time)
+      raise Timeout::Error if delta <= 0.0
+      @condition.wait(@mutex, delta)
+      delta = @timeout - (Time.now - start_time)
+      raise Timeout::Error if delta <= 0.0
+    end
   end
 end
