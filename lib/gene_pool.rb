@@ -98,7 +98,7 @@ class GenePool
     elsif @idle_timeout && (Time.now - connection._last_used) >= @idle_timeout
       connection = renew(connection)
     end
-    
+
     @logger.debug {"#{@name}: Checkout connection #{connection}(#{connection.object_id}) self=#{self}"}
     return connection
   end
@@ -117,7 +117,7 @@ class GenePool
     end
     @logger.debug {"#{@name}: Checkin connection #{connection}(#{connection.object_id}) self=#{self}"}
   end
-  
+
   # Create a scope for checking out a connection
   # The client should handle cleanup on exception which should be something similar to the following:
   #   rescue Exception => e
@@ -218,7 +218,7 @@ class GenePool
     @logger.debug {"#{@name}: Renewed connection old=#{old_connection.object_id} new=#{new_connection}(#{new_connection.object_id})"}
     return new_connection
   end
-  
+
   # Perform the given block for each connection.  Note that close should be used for safely closing all connections
   # This should probably only ever be used to allow interrupt of a connection that is checked out?
   def each
@@ -270,7 +270,7 @@ class GenePool
     # Thread is used as a reserved_connection_placeholder so don't close the connection if it's actually a thread
     return if connection.kind_of?(Thread)
     if @close_proc.kind_of?(Symbol)
-      connection.send(@close_proc)
+      connection.__send__(@close_proc)
     else
       @close_proc.call(connection)
     end
