@@ -1,6 +1,10 @@
 GenePool Changelog
 =====================
 
+1.3.1 / 2013-12-05
+
+  - close_connection(): close method is correctly invoked when @close_proc is Symbol and connection overrides send() (LMolr)
+
 1.3.0 / 2012-09-10
 
   - Allow :timeout option to raise Timeout::Error if waiting for a connection exceeds this value.
