@@ -19,7 +19,7 @@ class DummyConnection
     @closed = false
     @other_closed = false
   end
-  
+
   def to_s
     @count.to_s
   end
@@ -43,8 +43,12 @@ class DummyConnection
   def other_closed?
     @other_closed
   end
+
+  def send(msg, flags)
+    # override Object#send ( to simulate e.g. BasicSocket#send )
+  end
 end
-    
+
 
 class GenePoolTest < Test::Unit::TestCase
 
@@ -60,7 +64,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert                   @gene_pool.logger
     end
   end
-  
+
   context '' do
     setup do
       #@stringio = StringIO.new
@@ -101,7 +105,7 @@ class GenePoolTest < Test::Unit::TestCase
         assert_equal 0, @gene_pool.checked_out.size
       end
     end
-  
+
     should 'create 2 connections' do
       conn1 = @gene_pool.checkout
       (1..3).each do |i|
@@ -120,7 +124,7 @@ class GenePoolTest < Test::Unit::TestCase
       @gene_pool.checkin(conn1)
       assert_equal 0, @gene_pool.checked_out.size
     end
-  
+
     should 'be able to reset multiple times' do
       @gene_pool.with_connection do |conn1|
         conn2 = @gene_pool.renew(conn1)
@@ -134,7 +138,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 1, @gene_pool.connections.size
       assert_equal 0, @gene_pool.checked_out.size
     end
-  
+
     should 'be able to remove connection' do
       @gene_pool.with_connection do |conn|
         @gene_pool.remove(conn)
@@ -144,7 +148,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 0, @gene_pool.connections.size
       assert_equal 0, @gene_pool.checked_out.size
     end
-  
+
     should 'be able to remove multiple connections' do
       @gene_pool.with_connection do |conn1|
         @gene_pool.with_connection do |conn2|
@@ -165,7 +169,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 1, @gene_pool.connections.size
       assert_equal 0, @gene_pool.checked_out.size
     end
-  
+
     should 'handle aborted connection' do
       @gene_pool.with_connection do |conn1|
         @sleep = 2
@@ -188,7 +192,7 @@ class GenePoolTest < Test::Unit::TestCase
         end
       end
     end
-  
+
     should 'not allow more than pool_size connections' do
       conns = []
       pool_size = @gene_pool.pool_size
@@ -367,7 +371,6 @@ class GenePoolTest < Test::Unit::TestCase
       assert !conn.closed?
       assert conn.other_closed?
     end
-
 
     should 'allow nil so it does not execute a close' do
       @gene_pool = GenePool.new(:close_proc => nil) do
