@@ -1,5 +1,10 @@
 source "http://rubygems.org"
 
+platforms :rbx do
+  gem 'rubysl', '~> 2.0'
+  gem 'rubysl-test-unit'
+end
+
 group :development do
   gem 'rake'
   gem 'rdoc'
