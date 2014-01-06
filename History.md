@@ -1,6 +1,10 @@
 GenePool Changelog
 =====================
 
+1.3.2 / 2014-01-06
+
+  - Fix bug where connections that failed renew and were nil were attempting to be released.  (Which would generally swallow the originating exception).
+
 1.3.1 / 2013-12-05
 
   - close_connection(): close method is correctly invoked when @close_proc is Symbol and connection overrides send() (LMolr)

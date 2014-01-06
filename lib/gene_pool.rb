@@ -137,7 +137,7 @@ class GenePool
         # Update connection for any renew's that have occurred
         connection = @with_map.delete(connection.object_id)
       end
-      checkin(connection)
+      checkin(connection) if connection
     end
   end
 
