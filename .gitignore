@@ -2,8 +2,7 @@ doc
 .idea
 gene_pool-*.gem
 Gemfile.lock
-.rvmrc
-.rbenv-*
+.ruby-version
 .bundle
 bin
 vendor
