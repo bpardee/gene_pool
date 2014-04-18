@@ -1,6 +1,12 @@
 GenePool Changelog
 =====================
 
+1.4.0 / 2014-04-18
+
+  - Use Monitor instead of Mutex for locking to prevent recursive lock issues.
+  - Fix tests where Timeout.timeout without passing exception in raises unrescueable Timeout::Error in ruby 2.1 so cleanup does not occur.
+  - Allow option timeout_class which will get raised instead of Timeout::Error
+
 1.3.2 / 2014-01-06
 
   - Fix bug where connections that failed renew and were nil were attempting to be released.  (Which would generally swallow the originating exception).

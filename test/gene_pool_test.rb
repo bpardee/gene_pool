@@ -11,6 +11,8 @@ class GenePool
   attr_reader :connections, :checked_out, :with_map
 end
 
+class MyTimeoutError < RuntimeError; end
+
 class DummyConnection
   attr_reader :count
   def initialize(count, sleep_time=nil)
@@ -405,39 +407,46 @@ class GenePoolTest < Test::Unit::TestCase
 
   context 'timeout' do
     setup do
-      @gene_pool = GenePool.new(:name         => 'TestGenePool',
-                                :pool_size    => 2,
-                                :close_proc   => nil,
-                                :timeout      => 1.0) do
-        Object.new
+      @timeout_classes = [nil, MyTimeoutError]
+      @gene_pools = @timeout_classes.map do |timeout_class|
+        GenePool.new(:name          => 'TestGenePool',
+                     :pool_size     => 2,
+                     :close_proc    => nil,
+                     :timeout       => 1.0,
+                     :timeout_class => timeout_class) do
+          Object.new
+        end
       end
     end
 
     should 'timeout when the timeout period has expired' do
-      pool_size = @gene_pool.pool_size
-      # Do it with new connections and old connections
-      (1..2).each do |n|
-        (1..pool_size).each do |i|
-          Thread.new do
-            @gene_pool.with_connection do |c|
-              sleep(2)
+      @gene_pools.each_with_index do |gene_pool, class_index|
+        pool_size = gene_pool.pool_size
+        # Do it with new connections and old connections
+        (1..2).each do |n|
+          (1..pool_size).each do |i|
+            Thread.new do
+              gene_pool.with_connection do |c|
+                sleep(2)
+              end
             end
           end
+          # Let the threads get the connections
+          sleep(0.1)
+          start_time = Time.now
+          timeout_class = @timeout_classes[class_index] || Timeout::Error
+          assert_raises timeout_class do
+            gene_pool.with_connection { |c| }
+            puts "No timeout after #{Time.now - start_time} seconds"
+          end
+          puts "#{Time.now-start_time} should be around 1.0"
+          assert_equal pool_size, gene_pool.connections.size
+          assert_equal pool_size, gene_pool.checked_out.size
+          # Let the threads complete so we can do it again
+          sleep 2
+          assert_equal pool_size, gene_pool.connections.size
+          assert_equal 0,         gene_pool.checked_out.size
         end
-        # Let the threads get the connections
-        sleep(0.1)
-        start_time = Time.now
-        assert_raises Timeout::Error do
-          @gene_pool.with_connection { |c| }
-          puts "No timeout after #{Time.now - start_time} seconds"
-        end
-        puts "#{Time.now-start_time} should be around 1.0"
-        assert_equal pool_size, @gene_pool.connections.size
-        assert_equal pool_size, @gene_pool.checked_out.size
-        # Let the threads complete so we can do it again
-        sleep 2
-        assert_equal pool_size, @gene_pool.connections.size
-        assert_equal 0,         @gene_pool.checked_out.size
       end
     end
   end

@@ -5,29 +5,31 @@ require 'monitor'
 # Generic connection pool class
 class GenePool
 
-  attr_accessor :name, :pool_size, :warn_timeout, :logger
+  attr_accessor :name, :pool_size, :warn_timeout, :logger, :timeout_class
 
   # Creates a gene_pool.  The passed block will be used to initialize a single instance of
   # the item being pooled (i.e., socket connection or whatever)
   # options -
-  #   name         - The name used in logging messages.
-  #   pool_size    - The maximum number of instances that will be created (Defaults to 1).
-  #   timeout      - Will raise a Timeout exception if waiting on a connection for this many seconds.
-  #   warn_timeout - Displays an error message if a checkout takes longer that the given time (used to give hints to increase the pool size).
-  #   idle_timeout - If set, the connection will be renewed if it hasn't been used in this amount of time (seconds).
-  #   logger       - The logger used for log messages, defaults to STDERR.
-  #   close_proc   - The process or method used to close a pooled instance when it is removed.
+  #   name          - The name used in logging messages.
+  #   pool_size     - The maximum number of instances that will be created (Defaults to 1).
+  #   timeout       - Will raise a Timeout exception if waiting on a connection for this many seconds.
+  #   timeout_class - Exception class to raise if timeout error, defaults to Timeout::Error
+  #   warn_timeout  - Displays an error message if a checkout takes longer that the given time (used to give hints to increase the pool size).
+  #   idle_timeout  - If set, the connection will be renewed if it hasn't been used in this amount of time (seconds).
+  #   logger        - The logger used for log messages, defaults to STDERR.
+  #   close_proc    - The process or method used to close a pooled instance when it is removed.
   #     Defaults to :close.  Set to nil for no-op or a symbol for a method or a proc that takes an argument for the instance.
   def initialize(options={}, &connect_block)
     @connect_block = connect_block
 
-    @name         = options[:name]         || 'GenePool'
-    @pool_size    = options[:pool_size]    || 1
-    @timeout      = options[:timeout]
-    @warn_timeout = options[:warn_timeout] || 5.0
-    @idle_timeout = options[:idle_timeout]
-    @logger       = options[:logger]
-    @close_proc   = options[:close_proc]   || (!options.has_key?(:close_proc) && :close)
+    @name          = options[:name]          || 'GenePool'
+    @pool_size     = options[:pool_size]     || 1
+    @timeout       = options[:timeout]
+    @timeout_class = options[:timeout_class] || Timeout::Error
+    @warn_timeout  = options[:warn_timeout]  || 5.0
+    @idle_timeout  = options[:idle_timeout]
+    @logger        = options[:logger]
+    @close_proc    = options[:close_proc]    || (!options.has_key?(:close_proc) && :close)
 
     unless @logger
       @logger = Logger.new(STDERR)
@@ -161,7 +163,7 @@ class GenePool
       begin
         yield connection
       rescue Exception => e
-        if e.kind_of?(Timeout::Error) || e.message =~ /expired/
+        if e.kind_of?(Timeout::Error) || e.kind_of?(@timeout_class) || e.message =~ /expired/
           remove(connection)
           raise
         end
@@ -298,9 +300,9 @@ class GenePool
   def wait_mutex(start_time)
     return @condition.wait unless @timeout
     delta = @timeout - (Time.now - start_time)
-    raise Timeout::Error if delta <= 0.0
+    raise @timeout_class if delta <= 0.0
     @condition.wait(delta)
     delta = @timeout - (Time.now - start_time)
-    raise Timeout::Error if delta <= 0.0
+    raise @timeout_class if delta <= 0.0
   end
 end
