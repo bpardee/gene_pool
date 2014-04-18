@@ -173,8 +173,8 @@ class GenePoolTest < Test::Unit::TestCase
     should 'handle aborted connection' do
       @gene_pool.with_connection do |conn1|
         @sleep = 2
-        assert_raises Timeout::Error do
-          Timeout.timeout(1) do
+        assert_raises RuntimeError do
+          Timeout.timeout(1, RuntimeError) do
             @gene_pool.with_connection { |conn2| }
           end
         end
@@ -204,8 +204,8 @@ class GenePoolTest < Test::Unit::TestCase
         assert_equal i, @gene_pool.checked_out.size
         assert_equal conns, @gene_pool.connections
       end
-      assert_raises Timeout::Error do
-        Timeout.timeout(1) do
+      assert_raises RuntimeError do
+        Timeout.timeout(1, RuntimeError) do
           @gene_pool.checkout
         end
       end
@@ -282,8 +282,8 @@ class GenePoolTest < Test::Unit::TestCase
     end
 
     should 'not auto-retry on timeout' do
-      assert_raises Timeout::Error do
-        Timeout.timeout(1) do
+      assert_raises RuntimeError do
+        Timeout.timeout(1, RuntimeError) do
           @gene_pool.with_connection_auto_retry do |conn|
             sleep 2
             assert false, true
