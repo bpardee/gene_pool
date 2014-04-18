@@ -1,5 +1,6 @@
 require 'logger'
 require 'thread'
+require 'monitor'
 
 # Generic connection pool class
 class GenePool
@@ -286,40 +287,20 @@ class GenePool
     close_connection(connection)
   end
 
-  if RUBY_VERSION < '1.9'
-    require 'monitor'
-    def setup_mutex
-      @connections.extend(MonitorMixin)
-      # Mutex for synchronizing pool access
-      @mutex = @connections
-      # Condition variable for waiting for an available connection
-      @condition = @mutex.new_cond
-    end
+  def setup_mutex
+    @connections.extend(MonitorMixin)
+    # Mutex for synchronizing pool access
+    @mutex = @connections
+    # Condition variable for waiting for an available connection
+    @condition = @mutex.new_cond
+  end
 
-    def wait_mutex(start_time)
-      return @condition.wait unless @timeout
-      delta = @timeout - (Time.now - start_time)
-      raise Timeout::Error if delta <= 0.0
-      @condition.wait(delta)
-      delta = @timeout - (Time.now - start_time)
-      raise Timeout::Error if delta <= 0.0
-    end
-
-  else # RUBY_VERSION >= '1.9'
-    def setup_mutex
-      # Mutex for synchronizing pool access
-      @mutex = Mutex.new
-      # Condition variable for waiting for an available connection
-      @condition = ConditionVariable.new
-    end
-
-    def wait_mutex(start_time)
-      return @condition.wait(@mutex) unless @timeout
-      delta = @timeout - (Time.now - start_time)
-      raise Timeout::Error if delta <= 0.0
-      @condition.wait(@mutex, delta)
-      delta = @timeout - (Time.now - start_time)
-      raise Timeout::Error if delta <= 0.0
-    end
+  def wait_mutex(start_time)
+    return @condition.wait unless @timeout
+    delta = @timeout - (Time.now - start_time)
+    raise Timeout::Error if delta <= 0.0
+    @condition.wait(delta)
+    delta = @timeout - (Time.now - start_time)
+    raise Timeout::Error if delta <= 0.0
   end
 end
