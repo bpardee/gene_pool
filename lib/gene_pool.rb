@@ -1,11 +1,13 @@
 require 'logger'
 require 'thread'
+require 'thread_safe'
 require 'monitor'
 
 # Generic connection pool class
 class GenePool
 
-  attr_accessor :name, :pool_size, :warn_timeout, :logger, :timeout_class
+  attr_accessor :name, :warn_timeout, :logger, :timeout_class
+  attr_reader   :pool_size
 
   # Creates a gene_pool.  The passed block will be used to initialize a single instance of
   # the item being pooled (i.e., socket connection or whatever)
@@ -40,7 +42,7 @@ class GenePool
     @checked_out = []
     # Map the original connections object_id within the with_connection method to the final connection.
     # This could change if the connection is renew'ed.
-    @with_map    = {}
+    @with_map    = ThreadSafe::Hash.new
 
     setup_mutex
   end
@@ -130,16 +132,12 @@ class GenePool
   # Note that with_connection_auto_remove automatically does this
   def with_connection
     connection = checkout
-    @mutex.synchronize do
-      @with_map[connection.object_id] = connection
-    end
+    @with_map[connection.object_id] = connection
     begin
       yield connection
     ensure
-      @mutex.synchronize do
-        # Update connection for any renew's that have occurred
-        connection = @with_map.delete(connection.object_id)
-      end
+      # Update connection for any renew's that have occurred
+      connection = @with_map.delete(connection.object_id)
       checkin(connection) if connection
     end
   end
@@ -149,7 +147,7 @@ class GenePool
     with_connection do |connection|
       begin
         yield connection
-      rescue Exception => e
+      rescue Exception
         remove(connection)
         raise
       end
@@ -204,10 +202,8 @@ class GenePool
     @mutex.synchronize do
       index = @checked_out.index(old_connection)
       raise Error.new("Can't reassign non-checked out connection for #{@name}") unless index
-      close_connection(old_connection)
       @checked_out[index] = new_connection
       @connections[@connections.index(old_connection)] = new_connection
-
       # If this is part of a with_connection block, then track our new connection
       if @with_map.respond_to?(:key)
         with_key = @with_map.key(old_connection)
@@ -218,7 +214,10 @@ class GenePool
 
       @with_map[with_key] = new_connection if with_key
     end
-    @logger.debug {"#{@name}: Renewed connection old=#{old_connection.object_id} new=#{new_connection}(#{new_connection.object_id})"}
+    # Since connection has been removed, it can be closed outside the mutex
+    close_connection(old_connection)
+
+    @logger.debug {"#{@name}: Renewed connection old=#{old_connection.inspect} new=#{new_connection.inspect}"}
     return new_connection
   end
 
@@ -226,11 +225,26 @@ class GenePool
   # This should probably only ever be used to allow interrupt of a connection that is checked out?
   def each
     @mutex.synchronize do
-      @connections.each { |connection| yield connection }
+      # Don't include the ones in a reserved_placeholder state because that object is meaningless
+      @connections.each { |connection| yield connection unless connection.kind_of?(Thread) }
     end
   end
 
+  # Return a copy of all the current connections
+  def connections
+    connections = @mutex.synchronize { connections = @connections.dup }
+    connections.delete_if { |c| c.kind_of?(Thread) }
+    connections.freeze
+    connections
+  end
+
+  # Close all connections and wait for active connections to complete
+  #
+  # Parameters:
+  #   timeout:
+  #     Maximum time to wait for connections to close before returning
   def close(timeout=10)
+    # Prevent any new connections from being handed out
     self.pool_size = 0
     start_time = Time.now
     while (Time.now - start_time) < timeout
