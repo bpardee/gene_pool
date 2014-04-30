@@ -1,6 +1,10 @@
 GenePool Changelog
 =====================
 
+1.4.1 / 2014-04-29
+  - Close connection outside of the mutex.
+  - When iterating over the connections, don't include connections still in the process of being created (set to the reserved_placeholder).
+
 1.4.0 / 2014-04-18
 
   - Use Monitor instead of Mutex for locking to prevent recursive lock issues.
