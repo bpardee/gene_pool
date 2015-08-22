@@ -6,7 +6,7 @@ require 'monitor'
 # Generic connection pool class
 class GenePool
 
-  attr_accessor :name, :warn_timeout, :logger, :timeout_class
+  attr_accessor :name, :warn_timeout, :logger, :timeout_class, :throttle
   attr_reader   :pool_size
 
   # Creates a gene_pool.  The passed block will be used to initialize a single instance of
@@ -26,6 +26,7 @@ class GenePool
 
     @name          = options[:name]          || 'GenePool'
     @pool_size     = options[:pool_size]     || 1
+    @throttle      = options[:throttle]      || false
     @timeout       = options[:timeout]
     @timeout_class = options[:timeout_class] || Timeout::Error
     @warn_timeout  = options[:warn_timeout]  || 5.0
@@ -77,8 +78,14 @@ class GenePool
         raise "Can't perform checkout, #{@name} has been closed" if @pool_size == 0
         until connection do
           if @checked_out.size < @connections.size
-            connection = (@connections - @checked_out).first
-            @checked_out << connection
+            connection = (@connections - @checked_out).sort_by(&:_last_used).first
+
+            if @throttle
+              interval = Time.now - connection._last_used
+              connection = nil unless interval > (1.0 / @throttle)
+            end
+
+            @checked_out << connection unless connection.nil?
           elsif @connections.size < @pool_size
             # Perform the actual connection outside the mutex
             connection = reserved_connection_placeholder
@@ -98,6 +105,7 @@ class GenePool
           "currently set to #{@pool_size}."
       end
     end
+
     if connection == reserved_connection_placeholder
       connection = renew(reserved_connection_placeholder)
     elsif @idle_timeout && (Time.now - connection._last_used) >= @idle_timeout
@@ -233,6 +241,14 @@ class GenePool
   # Return a copy of all the current connections
   def connections
     connections = @mutex.synchronize { connections = @connections.dup }
+    connections.delete_if { |c| c.kind_of?(Thread) }
+    connections.freeze
+    connections
+  end
+
+  # Return a copy of the currently checked out connections
+  def checked_out
+    connections = @mutex.synchronize { connections = @checked_out.dup }
     connections.delete_if { |c| c.kind_of?(Thread) }
     connections.freeze
     connections
