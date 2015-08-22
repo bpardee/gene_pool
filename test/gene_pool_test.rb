@@ -218,6 +218,21 @@ class GenePoolTest < Test::Unit::TestCase
       end
     end
 
+    should 'throttle request rate through each connection' do
+      @gene_pool.throttle = 10
+      interval = 1.0 / @gene_pool.throttle
+
+      1.upto(100) do
+        @gene_pool.with_connection_auto_remove do |conn|
+          next unless conn._last_used
+          delta = Time.now - conn._last_used
+          assert delta > interval, "Request rate violation"
+        end
+      end
+
+      @gene_pool.throttle = false
+    end
+
     should 'handle thread contention' do
       conns = []
       pool_size = @gene_pool.pool_size
