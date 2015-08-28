@@ -226,7 +226,7 @@ class GenePoolTest < Test::Unit::TestCase
         @gene_pool.with_connection_auto_remove do |conn|
           next unless conn._last_used
           delta = Time.now - conn._last_used
-          assert delta > interval, "Request rate violation"
+          assert delta >= interval, "Request rate violation"
         end
       end
 
