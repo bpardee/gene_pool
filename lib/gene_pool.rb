@@ -14,6 +14,7 @@ class GenePool
   # options -
   #   name          - The name used in logging messages.
   #   pool_size     - The maximum number of instances that will be created (Defaults to 1).
+  #   throttle      - The maximum allowed request rate through each conenction in pool (per second).
   #   timeout       - Will raise a Timeout exception if waiting on a connection for this many seconds.
   #   timeout_class - Exception class to raise if timeout error, defaults to Timeout::Error
   #   warn_timeout  - Displays an error message if a checkout takes longer that the given time (used to give hints to increase the pool size).
@@ -81,8 +82,9 @@ class GenePool
             connection = (@connections - @checked_out).sort_by(&:_last_used).first
 
             if @throttle
-              interval = Time.now - connection._last_used
-              connection = nil unless interval > (1.0 / @throttle)
+              allowed = (1.0 / @throttle)
+              actual  = Time.now - connection._last_used
+              @condition.wait(allowed - actual) if actual < allowed
             end
 
             @checked_out << connection unless connection.nil?
