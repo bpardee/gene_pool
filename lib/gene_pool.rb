@@ -84,7 +84,7 @@ class GenePool
             if @throttle
               allowed = (1.0 / @throttle)
               actual  = Time.now - connection._last_used
-              @condition.wait(allowed - actual) if actual < allowed
+              sleep allowed - actual if actual < allowed
             end
 
             @checked_out << connection unless connection.nil?
