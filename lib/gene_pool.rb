@@ -74,9 +74,11 @@ class GenePool
     start_time = Time.now
     connection = nil
     reserved_connection_placeholder = Thread.current
+
     begin
       @mutex.synchronize do
         raise "Can't perform checkout, #{@name} has been closed" if @pool_size == 0
+
         until connection do
           if @checked_out.size < @connections.size
             connection = (@connections - @checked_out).sort_by(&:_last_used).first
@@ -84,20 +86,26 @@ class GenePool
             if @throttle
               allowed = (1.0 / @throttle)
               actual  = Time.now - connection._last_used
-              sleep allowed - actual if actual < allowed
+
+              if actual < allowed
+                @connections.size < @pool_size ?
+                  connection = nil : sleep(allowed - actual)
+              end
             end
 
-            @checked_out << connection unless connection.nil?
-          elsif @connections.size < @pool_size
-            # Perform the actual connection outside the mutex
+            @checked_out << connection and next unless connection.nil?
+          end
+
+          if @connections.size < @pool_size
             connection = reserved_connection_placeholder
             @connections << connection
             @checked_out << connection
             @logger.debug {"#{@name}: Created connection ##{@connections.size} #{connection}(#{connection.object_id}) for #{name}"}
-          else
-            @logger.info "#{@name}: Waiting for an available connection, all #{@pool_size} connections are checked out."
-            wait_mutex(start_time)
+            next
           end
+
+          @logger.info "#{@name}: Waiting for an available connection, all #{@pool_size} connections are checked out."
+          wait_mutex(start_time)
         end
       end
     ensure
