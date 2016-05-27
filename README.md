@@ -44,7 +44,7 @@ Generic pooling library for connection pools.
 
         # Equivalent to send_message above
         def send_message_auto_remove
-          # On exception, close and reopen socket and perform retry
+          # On exception, close and remeove socket from pool
           @@gene_pool.with_connection_auto_remove do |socket|
             # use socket here,
           end
