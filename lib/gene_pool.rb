@@ -6,7 +6,7 @@ require 'monitor'
 # Generic connection pool class
 class GenePool
 
-  attr_accessor :name, :warn_timeout, :logger, :timeout_class
+  attr_accessor :name, :warn_timeout, :logger, :timeout_class, :throttle
   attr_reader   :pool_size
 
   # Creates a gene_pool.  The passed block will be used to initialize a single instance of
@@ -14,6 +14,7 @@ class GenePool
   # options -
   #   name          - The name used in logging messages.
   #   pool_size     - The maximum number of instances that will be created (Defaults to 1).
+  #   throttle      - The maximum allowed request rate through each conenction in pool (per second).
   #   timeout       - Will raise a Timeout exception if waiting on a connection for this many seconds.
   #   timeout_class - Exception class to raise if timeout error, defaults to Timeout::Error
   #   warn_timeout  - Displays an error message if a checkout takes longer that the given time (used to give hints to increase the pool size).
@@ -26,6 +27,7 @@ class GenePool
 
     @name          = options[:name]          || 'GenePool'
     @pool_size     = options[:pool_size]     || 1
+    @throttle      = options[:throttle]      || false
     @timeout       = options[:timeout]
     @timeout_class = options[:timeout_class] || Timeout::Error
     @warn_timeout  = options[:warn_timeout]  || 5.0
@@ -72,23 +74,38 @@ class GenePool
     start_time = Time.now
     connection = nil
     reserved_connection_placeholder = Thread.current
+
     begin
       @mutex.synchronize do
         raise "Can't perform checkout, #{@name} has been closed" if @pool_size == 0
+
         until connection do
           if @checked_out.size < @connections.size
-            connection = (@connections - @checked_out).first
-            @checked_out << connection
-          elsif @connections.size < @pool_size
-            # Perform the actual connection outside the mutex
+            connection = (@connections - @checked_out).sort_by(&:_last_used).first
+
+            if @throttle
+              allowed = (1.0 / @throttle)
+              actual  = Time.now - connection._last_used
+
+              if actual < allowed
+                @connections.size < @pool_size ?
+                  connection = nil : sleep(allowed - actual)
+              end
+            end
+
+            @checked_out << connection and next unless connection.nil?
+          end
+
+          if @connections.size < @pool_size
             connection = reserved_connection_placeholder
             @connections << connection
             @checked_out << connection
             @logger.debug {"#{@name}: Created connection ##{@connections.size} #{connection}(#{connection.object_id}) for #{name}"}
-          else
-            @logger.info "#{@name}: Waiting for an available connection, all #{@pool_size} connections are checked out."
-            wait_mutex(start_time)
+            next
           end
+
+          @logger.info "#{@name}: Waiting for an available connection, all #{@pool_size} connections are checked out."
+          wait_mutex(start_time)
         end
       end
     ensure
@@ -98,6 +115,7 @@ class GenePool
           "currently set to #{@pool_size}."
       end
     end
+
     if connection == reserved_connection_placeholder
       connection = renew(reserved_connection_placeholder)
     elsif @idle_timeout && (Time.now - connection._last_used) >= @idle_timeout
@@ -233,6 +251,14 @@ class GenePool
   # Return a copy of all the current connections
   def connections
     connections = @mutex.synchronize { connections = @connections.dup }
+    connections.delete_if { |c| c.kind_of?(Thread) }
+    connections.freeze
+    connections
+  end
+
+  # Return a copy of the currently checked out connections
+  def checked_out
+    connections = @mutex.synchronize { connections = @checked_out.dup }
     connections.delete_if { |c| c.kind_of?(Thread) }
     connections.freeze
     connections
