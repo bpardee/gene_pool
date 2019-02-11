@@ -7,8 +7,8 @@ Gem::Specification.new do |s|
   s.homepage      = 'http://github.com/bpardee/gene_pool'
   s.files         = Dir["{examples,lib}/**/*"] + %w(LICENSE.txt Rakefile Gemfile CHANGELOG.md README.md)
   s.test_files    = ["test/gene_pool_test.rb"]
-  s.license       = 'blah'
+  s.license       = 'MIT'
   s.version       = '1.5.0'
   s.require_paths = ["lib"]
-  s.add_dependency('concurrent-ruby')
+  s.add_dependency 'concurrent-ruby', '>= 1.0'
 end
