@@ -1,18 +1,7 @@
-source "http://rubygems.org"
+source 'https://rubygems.org'
 
 gemspec
 
-platforms :rbx do
-  gem 'rubysl', '~> 2.0'
-  gem 'rubysl-test-unit'
-end
-
-group :development do
-  gem 'rake'
-  gem 'rdoc'
-end
-
-group :test do
-  gem 'minitest', "~> 4.0"
-  gem 'shoulda'
-end
+gem 'rake'
+gem 'awesome_print'
+gem 'minitest'

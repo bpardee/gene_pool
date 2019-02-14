@@ -1,14 +1,11 @@
-require 'rubygems'
-require 'test/unit'
-require 'shoulda'
-require 'gene_pool'
+require_relative 'test_helper.rb'
 require 'stringio'
 require 'logger'
 require 'timeout'
 
 # Increase visibility
 class GenePool
-  attr_reader :connections, :checked_out, :with_map
+  attr_reader :checked_out, :with_map
 end
 
 class MyTimeoutError < RuntimeError; end
@@ -51,15 +48,13 @@ class DummyConnection
   end
 end
 
-
-class GenePoolTest < Test::Unit::TestCase
-
-  context 'on default setup' do
-    setup do
+class GenePoolTest < Minitest::Test
+  describe 'on default setup' do
+    before do
       @gene_pool = GenePool.new { Object.new }
     end
 
-    should 'have default options set' do
+    it 'have default options set' do
       assert_equal 'GenePool', @gene_pool.name
       assert_equal 1,          @gene_pool.pool_size
       assert_equal 5.0,        @gene_pool.warn_timeout
@@ -67,8 +62,8 @@ class GenePoolTest < Test::Unit::TestCase
     end
   end
 
-  context '' do
-    setup do
+  describe GenePool do
+    before do
       #@stringio = StringIO.new
       #@logger = Logger.new($stdout)
       #@logger = Logger.new(@stringio)
@@ -88,14 +83,14 @@ class GenePoolTest < Test::Unit::TestCase
       end
     end
 
-    should 'have options set' do
+    it 'have options set' do
       assert_equal 'TestGenePool', @gene_pool.name
       assert_equal 10,             @gene_pool.pool_size
       assert_equal 2.0,            @gene_pool.warn_timeout
       #assert_same  @logger,        @gene_pool.logger
     end
 
-    should 'create 1 connection' do
+    it 'create 1 connection' do
       (1..3).each do |i|
         @gene_pool.with_connection do |conn|
           assert_equal conn.count, 1
@@ -108,7 +103,7 @@ class GenePoolTest < Test::Unit::TestCase
       end
     end
 
-    should 'create 2 connections' do
+    it 'create 2 connections' do
       conn1 = @gene_pool.checkout
       (1..3).each do |i|
         @gene_pool.with_connection do |conn2|
@@ -127,7 +122,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 0, @gene_pool.checked_out.size
     end
 
-    should 'be able to reset multiple times' do
+    it 'be able to reset multiple times' do
       @gene_pool.with_connection do |conn1|
         conn2 = @gene_pool.renew(conn1)
         conn3 = @gene_pool.renew(conn2)
@@ -141,7 +136,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 0, @gene_pool.checked_out.size
     end
 
-    should 'be able to remove connection' do
+    it 'be able to remove connection' do
       @gene_pool.with_connection do |conn|
         @gene_pool.remove(conn)
         assert_equal 0, @gene_pool.connections.size
@@ -151,7 +146,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 0, @gene_pool.checked_out.size
     end
 
-    should 'be able to remove multiple connections' do
+    it 'be able to remove multiple connections' do
       @gene_pool.with_connection do |conn1|
         @gene_pool.with_connection do |conn2|
           @gene_pool.with_connection do |conn3|
@@ -172,7 +167,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 0, @gene_pool.checked_out.size
     end
 
-    should 'handle aborted connection' do
+    it 'handle aborted connection' do
       @gene_pool.with_connection do |conn1|
         @sleep = 2
         assert_raises RuntimeError do
@@ -195,7 +190,7 @@ class GenePoolTest < Test::Unit::TestCase
       end
     end
 
-    should 'not allow more than pool_size connections' do
+    it 'not allow more than pool_size connections' do
       conns = []
       pool_size = @gene_pool.pool_size
       (1..pool_size).each do |i|
@@ -218,7 +213,7 @@ class GenePoolTest < Test::Unit::TestCase
       end
     end
 
-    should 'handle thread contention' do
+    it 'handle thread contention' do
       conns = []
       pool_size = @gene_pool.pool_size
       # Do it with new connections and old connections
@@ -248,7 +243,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal (1..pool_size).to_a, ival_conns
     end
 
-    should 'be able to auto-retry connection' do
+    it 'be able to auto-retry connection' do
       conns = []
       @gene_pool.with_connection_auto_retry do |conn|
         conns << conn
@@ -269,7 +264,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 0, @gene_pool.checked_out.size
     end
 
-    should 'fail with auto-retry on double failure' do
+    it 'fail with auto-retry on double failure' do
       e = assert_raises Exception do
         @gene_pool.with_connection_auto_retry do |conn|
           conn.fail_on(1,2)
@@ -283,7 +278,7 @@ class GenePoolTest < Test::Unit::TestCase
       end
     end
 
-    should 'not auto-retry on timeout' do
+    it 'not auto-retry on timeout' do
       assert_raises RuntimeError do
         Timeout.timeout(1, RuntimeError) do
           @gene_pool.with_connection_auto_retry do |conn|
@@ -303,7 +298,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert_equal 0, @gene_pool.checked_out.size
     end
 
-    should 'allow cleanup of idle connections' do
+    it 'allow cleanup of idle connections' do
       conn1 = @gene_pool.checkout
       conn2 = @gene_pool.checkout
       @gene_pool.checkin(conn1)
@@ -318,8 +313,8 @@ class GenePoolTest < Test::Unit::TestCase
     end
   end
 
-  context 'idle timeout' do
-    setup do
+  describe 'idle timeout' do
+    before do
       # Override sleep in individual tests
       @sleep = nil
       counter = 0
@@ -335,7 +330,7 @@ class GenePoolTest < Test::Unit::TestCase
       end
     end
 
-    should 'create a new connection if we pass the idle timeout' do
+    it 'create a new connection if we pass the idle timeout' do
       conn1, conn2, conn3 = nil
       @gene_pool.with_connection { |conn| conn1 = conn }
       @gene_pool.with_connection { |conn| conn2 = conn }
@@ -351,8 +346,8 @@ class GenePoolTest < Test::Unit::TestCase
     end
   end
 
-  context 'close_proc' do
-    should 'default to close if not specified' do
+  describe 'close_proc' do
+    it 'default to close if not specified' do
       @gene_pool = GenePool.new do
         DummyConnection.new(0, 0)
       end
@@ -363,7 +358,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert !conn.other_closed?
     end
 
-    should 'allow symbol to execute a different method from close' do
+    it 'allow symbol to execute a different method from close' do
       @gene_pool = GenePool.new(:close_proc => :other_close) do
         DummyConnection.new(0, 0)
       end
@@ -374,7 +369,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert conn.other_closed?
     end
 
-    should 'allow nil so it does not execute a close' do
+    it 'allow nil so it does not execute a close' do
       @gene_pool = GenePool.new(:close_proc => nil) do
         DummyConnection.new(0, 0)
       end
@@ -385,7 +380,7 @@ class GenePoolTest < Test::Unit::TestCase
       assert !conn.other_closed?
     end
 
-    should 'allow proc that gets executed on close' do
+    it 'allow proc that gets executed on close' do
       foo = 1
       close_conn = nil
       my_close = lambda do |conn|
@@ -405,8 +400,8 @@ class GenePoolTest < Test::Unit::TestCase
     end
   end
 
-  context 'timeout' do
-    setup do
+  describe 'timeout' do
+    before do
       @timeout_classes = [nil, MyTimeoutError]
       @gene_pools = @timeout_classes.map do |timeout_class|
         GenePool.new(:name          => 'TestGenePool',
@@ -419,7 +414,7 @@ class GenePoolTest < Test::Unit::TestCase
       end
     end
 
-    should 'timeout when the timeout period has expired' do
+    it 'timeout when the timeout period has expired' do
       @gene_pools.each_with_index do |gene_pool, class_index|
         pool_size = gene_pool.pool_size
         # Do it with new connections and old connections

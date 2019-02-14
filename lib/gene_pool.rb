@@ -1,6 +1,6 @@
 require 'logger'
 require 'thread'
-require 'thread_safe'
+require 'concurrent-ruby'
 require 'monitor'
 
 # Generic connection pool class
@@ -42,7 +42,7 @@ class GenePool
     @checked_out = []
     # Map the original connections object_id within the with_connection method to the final connection.
     # This could change if the connection is renew'ed.
-    @with_map    = ThreadSafe::Hash.new
+    @with_map    = Concurrent::Hash.new
 
     setup_mutex
   end

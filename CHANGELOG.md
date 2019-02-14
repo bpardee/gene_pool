@@ -1,6 +1,11 @@
 GenePool Changelog
 =====================
 
+1.5.0 / 2019-02-11
+  - Replace deprecated `thread_safe` gem with `concurrent-ruby`.
+  - Update tests with latest mini-test spec.
+  - Update Readme.
+
 1.4.1 / 2014-04-29
   - Close connection outside of the mutex.
   - When iterating over the connections, don't include connections still in the process of being created (set to the reserved_placeholder).
